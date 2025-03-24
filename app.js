@@ -3,7 +3,7 @@ let scene, camera, renderer;
 let controls;        // OrbitControls
 let pointsGroup;     // Group holding the points and connections
 let animationFrameId;
-let rotationSpeed = 0.0005; // Slow spin
+let rotationSpeed = 0.0015; // Slow spin
 
 // Default 5-digit number seed
 const DEFAULT_SEED = "12345";
