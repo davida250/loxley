@@ -5,7 +5,7 @@
   <title>3D NFT Dot Generator</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    canvas { display: block; } /* Ensures no extra space around canvas */
+    canvas { display: block; }
     #ui {
       position: absolute;
       top: 20px;
@@ -23,74 +23,69 @@
     <h3>3D NFT Dot Generator</h3>
     <input type="number" id="numberInput" placeholder="Enter 5-digit number" />
     <button id="generateButton">Generate</button>
-    <p>Tip: You should see a spinning cube by default.</p>
+    <p>Debug: A rotating cube should appear by default.</p>
   </div>
-  <!-- Three.js Library from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- OrbitControls for mouse interaction from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+  <!-- Three.js Library from unpkg -->
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <!-- OrbitControls from unpkg -->
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
+      console.log("DOM loaded.");
       let scene, camera, renderer, controls;
       
+      // Initialize the scene
       function init() {
-        // Create scene and set background color
+        // Create the scene and set a light gray background
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf0f0f0);
         
-        // Set up the camera (FOV, aspect ratio, near and far clipping planes)
-        camera = new THREE.PerspectiveCamera(
-          75,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          1000
-        );
+        // Set up the camera: FOV, aspect ratio, near and far clipping planes
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 0, 5);
         
-        // Create the WebGL renderer and attach its canvas to the document
+        // Create the renderer and add its canvas to the document body
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
         
-        // Add OrbitControls so the user can interact with the scene
+        // Set up OrbitControls so the user can rotate the scene with the mouse
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         
-        // Add basic lighting
+        // Add ambient and directional lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
         
-        // Add a default cube to confirm the scene is rendering
+        // Add a default debug cube to ensure the scene is rendering
         const cubeGeometry = new THREE.BoxGeometry();
         const cubeMaterial = new THREE.MeshNormalMaterial();
         const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.userData.isDebug = true;  // Mark as debug object so it won't be removed later
+        cube.userData.isDebug = true;  // Mark as debug so we don't remove it later
         scene.add(cube);
         
         animate();
       }
-
-      // Animation/render loop
+      
+      // Animation loop: continuously render the scene
       function animate() {
         requestAnimationFrame(animate);
         controls.update();
         renderer.render(scene, camera);
       }
-
-      // Simple pseudo-random generator using sine (for dot positioning)
+      
+      // A simple pseudo-random generator using sine for positioning
       function pseudoRandom(seed) {
         const x = Math.sin(seed) * 10000;
         return x - Math.floor(x);
       }
-
-      // Generate 5 dots (spheres) in 3D space based on a 5-digit input
+      
+      // Generate 5 dots (spheres) based on the user input
       function generateDots() {
         console.log("Generate button pressed.");
-        const inputElem = document.getElementById("numberInput");
-        // Ensure the value is treated as a string
-        const input = inputElem.value.toString();
+        const input = document.getElementById("numberInput").value.toString();
         console.log("User input:", input);
         if (input.length !== 5) {
           alert("Please enter a 5-digit number.");
@@ -98,45 +93,41 @@
         }
         const seed = parseInt(input, 10);
         
-        // Remove previously generated dots (but leave the debug cube)
-        const objectsToRemove = [];
+        // Remove previously generated dots (keep the debug cube)
         scene.traverse(function(child) {
           if (child.userData && child.userData.isDot) {
-            objectsToRemove.push(child);
+            scene.remove(child);
+            console.log("Removed previous dot:", child);
           }
         });
-        objectsToRemove.forEach(obj => {
-          scene.remove(obj);
-          console.log("Removed old dot:", obj);
-        });
         
-        // Generate and add new dots (spheres)
+        // Create and add 5 new dots
         for (let i = 0; i < 5; i++) {
           const geometry = new THREE.SphereGeometry(0.1, 32, 32);
           const material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
           const sphere = new THREE.Mesh(geometry, material);
           sphere.userData.isDot = true;
           
-          // Vary the seed to generate unique (x, y, z) positions
+          // Modify the seed for each sphere for unique positions
           const currentSeed = seed + i;
-          const x = pseudoRandom(currentSeed) * 4 - 2;          // Range: -2 to 2
-          const y = pseudoRandom(currentSeed + 100) * 4 - 2;      // Offset for y-axis
-          const z = pseudoRandom(currentSeed + 200) * 4 - 2;      // Offset for z-axis
+          const x = pseudoRandom(currentSeed) * 4 - 2;         // x range: -2 to 2
+          const y = pseudoRandom(currentSeed + 100) * 4 - 2;     // y range: -2 to 2
+          const z = pseudoRandom(currentSeed + 200) * 4 - 2;     // z range: -2 to 2
           sphere.position.set(x, y, z);
-          console.log(`Dot ${i} position: x=${x}, y=${y}, z=${z}`);
+          console.log(`Dot ${i}: x=${x}, y=${y}, z=${z}`);
           
           scene.add(sphere);
         }
       }
-
-      // Adjust renderer and camera on window resize
+      
+      // Adjust the renderer and camera when the window is resized
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
-
-      // Attach event listener to the Generate button
+      
+      // Attach the generateDots function to the Generate button
       document.getElementById("generateButton").addEventListener("click", generateDots);
       
       // Initialize the scene
