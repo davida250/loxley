@@ -2,18 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>5-Digit Three.js Visualization</title>
+  <title>Loxley NFT Visualization</title>
   <style>
-    /* Basic CSS Reset / Layout */
-    body, html {
+    /* Basic Reset and Fullscreen Layout */
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+    html, body {
       width: 100%;
       height: 100%;
-      font-family: sans-serif;
-      background-color: #202020;
-      color: #ffffff;
-      overflow: hidden; /* Remove scrollbars, if desired */
+      font-family: "Helvetica Neue", sans-serif;
+      background: linear-gradient(120deg, #1c1c1c, #3a3a3a);
+      color: #fff;
+      overflow: hidden; /* Hide scrollbars */
     }
 
     #container {
@@ -22,55 +25,88 @@
       position: relative;
     }
 
-    #inputPanel {
+    /* Centered Stats Panel (top-right corner) */
+    #statsPanel {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 10;
+      top: 15px;
+      right: 20px;
       background: rgba(0, 0, 0, 0.6);
-      padding: 8px;
-      border-radius: 5px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 200px;
+      text-align: right;
     }
-
-    #digitInput {
-      width: 80px;
-      text-align: center;
+    #statsPanel h3 {
+      margin-bottom: 8px;
+      font-weight: 500;
       font-size: 16px;
-      padding: 4px;
-      border: none;
-      border-radius: 3px;
-      outline: none;
+    }
+    .statItem {
+      margin: 4px 0;
     }
 
+    /* Bottom Panel for the Input */
+    #bottomPanel {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      text-align: center;
+    }
+    #digitInput {
+      width: 160px; /* Twice as big as a typical input */
+      padding: 10px;
+      font-size: 18px;
+      border: none;
+      border-radius: 4px;
+      outline: none;
+      text-align: center;
+      color: #333;
+    }
     #updateBtn {
-      margin-left: 8px;
-      padding: 5px 10px;
+      margin-left: 10px;
+      padding: 10px 16px;
       font-size: 16px;
       cursor: pointer;
       border: none;
-      border-radius: 3px;
-      background-color: #ff0090;
-      color: #ffffff;
+      border-radius: 4px;
+      background-color: #FF006E;
+      color: #fff;
+      transition: background-color 0.3s ease;
+    }
+    #updateBtn:hover {
+      background-color: #E60063;
     }
   </style>
 </head>
 <body>
   <div id="container">
-    <!-- Input Panel -->
-    <div id="inputPanel">
+    <!-- Stats in the top-right corner -->
+    <div id="statsPanel">
+      <h3>Visualization Stats</h3>
+      <div class="statItem" id="nftAddressStat"></div>
+      <div class="statItem" id="pointCountStat"></div>
+      <div class="statItem" id="speedStat"></div>
+    </div>
+
+    <!-- Bottom Panel with input field and update button -->
+    <div id="bottomPanel">
       <input 
         type="text" 
         id="digitInput" 
         maxlength="5" 
-        placeholder="12345"
-        value="12345" />
+        placeholder="12345" 
+        value="12345" 
+      />
       <button id="updateBtn">Update</button>
     </div>
   </div>
 
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- Our App Logic -->
+  <!-- THREE.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <!-- OrbitControls (for mouse interaction) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Our main app logic -->
   <script src="app.js"></script>
 </body>
 </html>
