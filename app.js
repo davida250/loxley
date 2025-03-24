@@ -2,8 +2,9 @@
 let scene, camera, renderer;
 let controls;        // OrbitControls
 let pointsGroup;     // Group holding the points
+let sphereWireframe; // Wireframe for sphere outline
 let animationFrameId;
-let rotationSpeed = 0.0005; // Slow spin
+let rotationSpeed = 0.0015; // Slow spin
 
 // Default 5-digit number
 const DEFAULT_SEED = "12345";
@@ -37,9 +38,6 @@ function initScene() {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; // Smooth camera motion
   controls.dampingFactor = 0.05;
-  // (Optionally disable auto-rotation if you only want manual rotation)
-  // controls.autoRotate = true;
-  // controls.autoRotateSpeed = 0.1;
 
   // Listen for window resize
   window.addEventListener("resize", onWindowResize, false);
@@ -65,7 +63,7 @@ function createSphereWithSeed(numberString) {
     cancelAnimationFrame(animationFrameId);
   }
 
-  // If we already have a pointsGroup, remove it from the scene and dispose
+  // Remove previous points group if exists
   if (pointsGroup) {
     scene.remove(pointsGroup);
     pointsGroup.traverse((obj) => {
@@ -76,53 +74,50 @@ function createSphereWithSeed(numberString) {
     });
   }
 
+  // Remove previous wireframe if exists
+  if (sphereWireframe) {
+    scene.remove(sphereWireframe);
+    sphereWireframe.geometry.dispose();
+    sphereWireframe.material.dispose();
+  }
+
   // Create a new group for points
   pointsGroup = new THREE.Group();
   scene.add(pointsGroup);
 
   // Use the 5-digit string as a seed for consistent "random" distribution
-  // 1) Convert the string to an integer for seed
-  //    or combine digits in some way to generate a pseudo-random seed
   const seed = parseInt(numberString, 10);
-
-  // 2) Create a seeded random function
   let pseudoRandom = seededRandom(seed);
 
   // Decide how many points (40-80)
-  // We can use a bit of the seed or random to pick a count within that range
   const totalPoints = 40 + Math.floor(pseudoRandom() * 41); // 40 to 80
 
-  // We'll keep the radius of the sphere constant (e.g., 15)
+  // Set the sphere's radius
   const sphereRadius = 15;
 
-  // For color generation, we might:
-  // - Use hue variations with the seed as an offset
-  // - Or create a random color for each point based on the seeded RNG
-  // We'll do something like a random HSL for each point
-  // but with an offset from the seed
+  // For color generation, derive a base hue from the seed
   const hueBase = (seed % 360) / 360; // base hue from the seed (0-1)
 
+  // Create points that live on the surface of the sphere
   for (let i = 0; i < totalPoints; i++) {
-    // Random radius from 0..sphereRadius
-    // but for a uniform distribution in a sphere, we sample radius^(1/3).
-    const r = Math.cbrt(pseudoRandom()) * sphereRadius;
+    // All points lie on the surface so r = sphereRadius
+    const r = sphereRadius;
 
     // Random angles in spherical coordinates
     const theta = pseudoRandom() * Math.PI * 2; // 0..2π
     const phi = Math.acos((pseudoRandom() * 2) - 1); // 0..π
 
-    // Convert spherical to Cartesian
+    // Convert spherical to Cartesian coordinates
     const x = r * Math.sin(phi) * Math.cos(theta);
     const y = r * Math.sin(phi) * Math.sin(theta);
     const z = r * Math.cos(phi);
 
-    // Create a small sphere (point) or use Points
-    // We'll use a small sphere geometry
-    const geometry = new THREE.SphereGeometry(0.4, 8, 8);
+    // Create a small sphere for the point (half the previous size)
+    const geometry = new THREE.SphereGeometry(0.2, 8, 8);
 
-    // Unique color per point (random hue, but base offset from hueBase)
+    // Generate a brighter color (increased lightness) using HSL
     const hue = (hueBase + pseudoRandom()) % 1.0;
-    const color = new THREE.Color().setHSL(hue, 0.8, 0.5);
+    const color = new THREE.Color().setHSL(hue, 0.8, 0.7); // brighter lightness
     const material = new THREE.MeshStandardMaterial({ color });
 
     const pointMesh = new THREE.Mesh(geometry, material);
@@ -130,8 +125,14 @@ function createSphereWithSeed(numberString) {
     pointsGroup.add(pointMesh);
   }
 
-  // Add some lighting to see the spheres
-  // (Remove old lights if re-creating them, or store them globally.)
+  // Add a light blue wireframe sphere to outline the boundary
+  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 16, 16);
+  const wireframeGeo = new THREE.WireframeGeometry(sphereGeometry);
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xadd8e6, opacity: 0.5, transparent: true });
+  sphereWireframe = new THREE.LineSegments(wireframeGeo, lineMaterial);
+  scene.add(sphereWireframe);
+
+  // Add lights to the scene
   addLights();
 
   // Update stats in the top-right panel
@@ -147,9 +148,7 @@ function createSphereWithSeed(numberString) {
 // addLights()
 // ----------------
 function addLights() {
-  // Remove any existing lights from the scene if needed
-  // (Optional – if you re-add them each time)
-  // For simplicity, let's just remove all lights:
+  // Remove any existing lights from the scene
   const oldLights = [];
   scene.traverse((obj) => {
     if (obj.isLight) oldLights.push(obj);
@@ -174,6 +173,12 @@ function animate() {
   if (pointsGroup) {
     pointsGroup.rotation.y += rotationSpeed;
     pointsGroup.rotation.x += rotationSpeed * 0.5;
+  }
+
+  // Also rotate the wireframe sphere in sync
+  if (sphereWireframe) {
+    sphereWireframe.rotation.y += rotationSpeed;
+    sphereWireframe.rotation.x += rotationSpeed * 0.5;
   }
 
   // Update OrbitControls
