@@ -1,157 +1,208 @@
-// app.js
-
+// Global variables
 let scene, camera, renderer;
-let dotsGroup;          // A group to hold all the dot meshes
-let animationFrameId;   // To manage requestAnimationFrame
+let controls;        // OrbitControls
+let pointsGroup;     // Group holding the points
+let animationFrameId;
+let rotationSpeed = 0.0005; // Slow spin
 
-// Some default settings
-const DEFAULT_NUMBER = "12345";
+// Default 5-digit number
+const DEFAULT_SEED = "12345";
 
-// Rotation speeds for x, y, z axes (we’ll use the last digit for speed)
-let rotationSpeed = 0.01;
-
-// Initialize
+// 1. Initialize the scene
 initScene();
-renderScene(DEFAULT_NUMBER); // Render with default on initial load
 
-// -----------------------
-// 1. Scene Initialization
-// -----------------------
+// 2. Render the scene with the default seed
+createSphereWithSeed(DEFAULT_SEED);
+
+// --------------------
+// initScene() function
+// --------------------
 function initScene() {
-  // Create the scene
+  // Scene & Camera
   scene = new THREE.Scene();
-  
-  // Create a perspective camera
   camera = new THREE.PerspectiveCamera(
-    75,                       // Field of view
-    window.innerWidth / window.innerHeight, // Aspect ratio
-    0.1,                      // Near clipping
-    1000                      // Far clipping
+    60,                             // FOV
+    window.innerWidth / window.innerHeight, // Aspect
+    0.1,                            // Near
+    1000                            // Far
   );
-  camera.position.z = 50;     // Pull camera back so we can see the dots
+  camera.position.set(0, 0, 40);
 
-  // Create the renderer and add it to our container
+  // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.getElementById("container").appendChild(renderer.domElement);
 
-  // Handle window resizing
+  // OrbitControls for mouse interaction
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; // Smooth camera motion
+  controls.dampingFactor = 0.05;
+  // (Optionally disable auto-rotation if you only want manual rotation)
+  // controls.autoRotate = true;
+  // controls.autoRotateSpeed = 0.1;
+
+  // Listen for window resize
   window.addEventListener("resize", onWindowResize, false);
 
-  // Setup an ambient light (optional)
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-  scene.add(ambientLight);
-
-  // Setup a directional light (optional)
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-  dirLight.position.set(10, 10, 10);
-  scene.add(dirLight);
-
-  // Listen to the update button click
-  document.getElementById("updateBtn").addEventListener("click", () => {
-    const inputVal = document.getElementById("digitInput").value.trim();
-    // Validate the input, ensure it’s exactly 5 digits
-    const isFiveDigits = /^[0-9]{5}$/.test(inputVal);
-    if (!isFiveDigits) {
-      alert("Please enter a valid 5-digit number (e.g., 12345).");
+  // On "Update" button click
+  const updateBtn = document.getElementById("updateBtn");
+  updateBtn.addEventListener("click", () => {
+    const seedInput = document.getElementById("digitInput").value.trim();
+    if (!/^\d{5}$/.test(seedInput)) {
+      alert("Please enter exactly 5 digits, e.g. 12345.");
       return;
     }
-    // Re-render the scene with the new number
-    renderScene(inputVal);
+    createSphereWithSeed(seedInput);
   });
 }
 
-// ---------------------------------
-// 2. Rendering / Creating the Dots
-// ---------------------------------
-function renderScene(numberStr) {
-  // Cancel any ongoing animation loop
+// ----------------------------------
+// createSphereWithSeed(numberString)
+// ----------------------------------
+function createSphereWithSeed(numberString) {
+  // Cancel any existing animation loop
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
 
-  // Clear old dots from the scene if they exist
-  if (dotsGroup) {
-    scene.remove(dotsGroup);
-    dotsGroup.traverse((obj) => {
-      if (obj.isMesh) obj.geometry.dispose();
+  // If we already have a pointsGroup, remove it from the scene and dispose
+  if (pointsGroup) {
+    scene.remove(pointsGroup);
+    pointsGroup.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.geometry.dispose();
+        obj.material.dispose();
+      }
     });
   }
 
-  // Parse the 5 digits
-  const digits = numberStr.split("").map(d => parseInt(d, 10));
-  // Example mapping:
-  // digit[0] -> number of dots along X
-  // digit[1] -> number of dots along Y
-  // digit[2] -> number of dots along Z
-  // digit[3] -> spacing between dots
-  // digit[4] -> rotation speed (and optional color offset)
+  // Create a new group for points
+  pointsGroup = new THREE.Group();
+  scene.add(pointsGroup);
 
-  const xCount = Math.max(digits[0], 1);
-  const yCount = Math.max(digits[1], 1);
-  const zCount = Math.max(digits[2], 1);
-  const spacing = digits[3] === 0 ? 1 : digits[3]; // Avoid zero spacing
-  rotationSpeed = digits[4] * 0.005 + 0.005; // e.g. digit 5 => speed from 0.005 to 0.05
+  // Use the 5-digit string as a seed for consistent "random" distribution
+  // 1) Convert the string to an integer for seed
+  //    or combine digits in some way to generate a pseudo-random seed
+  const seed = parseInt(numberString, 10);
 
-  // Create a group to hold the dots
-  dotsGroup = new THREE.Group();
-  
-  // Optional color offset from last digit
-  const colorOffset = digits[4] * 30; // Shift hue by increments
+  // 2) Create a seeded random function
+  let pseudoRandom = seededRandom(seed);
 
-  // Geometry & material
-  const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+  // Decide how many points (40-80)
+  // We can use a bit of the seed or random to pick a count within that range
+  const totalPoints = 40 + Math.floor(pseudoRandom() * 41); // 40 to 80
 
-  // We’ll loop through xCount, yCount, zCount
-  for (let x = 0; x < xCount; x++) {
-    for (let y = 0; y < yCount; y++) {
-      for (let z = 0; z < zCount; z++) {
-        // Create a mesh
-        // Color can be a function of x, y, z plus offset
-        const hue = ((x + y + z) * 5 + colorOffset) % 360;
-        const color = new THREE.Color(`hsl(${hue}, 100%, 50%)`);
-        const material = new THREE.MeshStandardMaterial({ color });
+  // We'll keep the radius of the sphere constant (e.g., 15)
+  const sphereRadius = 15;
 
-        const dot = new THREE.Mesh(geometry, material);
+  // For color generation, we might:
+  // - Use hue variations with the seed as an offset
+  // - Or create a random color for each point based on the seeded RNG
+  // We'll do something like a random HSL for each point
+  // but with an offset from the seed
+  const hueBase = (seed % 360) / 360; // base hue from the seed (0-1)
 
-        // Position the dot
-        dot.position.set(
-          x * spacing - ((xCount - 1) * spacing) / 2,
-          y * spacing - ((yCount - 1) * spacing) / 2,
-          z * spacing - ((zCount - 1) * spacing) / 2
-        );
+  for (let i = 0; i < totalPoints; i++) {
+    // Random radius from 0..sphereRadius
+    // but for a uniform distribution in a sphere, we sample radius^(1/3).
+    const r = Math.cbrt(pseudoRandom()) * sphereRadius;
 
-        dotsGroup.add(dot);
-      }
-    }
+    // Random angles in spherical coordinates
+    const theta = pseudoRandom() * Math.PI * 2; // 0..2π
+    const phi = Math.acos((pseudoRandom() * 2) - 1); // 0..π
+
+    // Convert spherical to Cartesian
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+
+    // Create a small sphere (point) or use Points
+    // We'll use a small sphere geometry
+    const geometry = new THREE.SphereGeometry(0.4, 8, 8);
+
+    // Unique color per point (random hue, but base offset from hueBase)
+    const hue = (hueBase + pseudoRandom()) % 1.0;
+    const color = new THREE.Color().setHSL(hue, 0.8, 0.5);
+    const material = new THREE.MeshStandardMaterial({ color });
+
+    const pointMesh = new THREE.Mesh(geometry, material);
+    pointMesh.position.set(x, y, z);
+    pointsGroup.add(pointMesh);
   }
 
-  // Add the group to the scene
-  scene.add(dotsGroup);
+  // Add some lighting to see the spheres
+  // (Remove old lights if re-creating them, or store them globally.)
+  addLights();
 
-  // Begin animation
+  // Update stats in the top-right panel
+  document.getElementById("nftAddressStat").textContent = `NFT Address: ${numberString}`;
+  document.getElementById("pointCountStat").textContent = `Points: ${totalPoints}`;
+  document.getElementById("speedStat").textContent = `Rotation Speed: ${rotationSpeed.toFixed(5)}`;
+
+  // Start the animation loop
   animate();
 }
 
-// ------------------------
-// 3. Animation & Rendering
-// ------------------------
+// ----------------
+// addLights()
+// ----------------
+function addLights() {
+  // Remove any existing lights from the scene if needed
+  // (Optional – if you re-add them each time)
+  // For simplicity, let's just remove all lights:
+  const oldLights = [];
+  scene.traverse((obj) => {
+    if (obj.isLight) oldLights.push(obj);
+  });
+  oldLights.forEach((light) => scene.remove(light));
+
+  // Add an ambient light
+  const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambient);
+
+  // Add a directional light
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(50, 50, 50);
+  scene.add(dirLight);
+}
+
+// -----------------------
+// animate() - Render Loop
+// -----------------------
 function animate() {
-  // Rotate the dots group
-  if (dotsGroup) {
-    dotsGroup.rotation.x += rotationSpeed;
-    dotsGroup.rotation.y += rotationSpeed;
+  // Slowly spin the entire points group
+  if (pointsGroup) {
+    pointsGroup.rotation.y += rotationSpeed;
+    pointsGroup.rotation.x += rotationSpeed * 0.5;
   }
 
+  // Update OrbitControls
+  controls.update();
+
+  // Render the scene
   renderer.render(scene, camera);
+
+  // Next frame
   animationFrameId = requestAnimationFrame(animate);
 }
 
-// ----------------------------
-// 4. Handle Window Resize
-// ----------------------------
+// -----------------------
+// onWindowResize()
+// -----------------------
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// --------------------------------------
+// A simple pseudo-random generator (PRNG)
+// --------------------------------------
+function seededRandom(seed) {
+  // Based on https://stackoverflow.com/a/47593316
+  // Returns a function that yields numbers in [0,1)
+  return function() {
+    const x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+  };
 }
